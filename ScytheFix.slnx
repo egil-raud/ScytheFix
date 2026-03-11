@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ScytheFix/ScytheFix/ScytheFix.csproj" />
+  <Project Path="ScytheFix/ZZCakeBuild/CakeBuild.csproj" />
+</Solution>
