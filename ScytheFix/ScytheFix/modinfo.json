@@ -1,0 +1,8 @@
+{
+  "type": "code",
+  "modid": "scythefix",
+  "name": "ScytheFix",
+  "authors": ["Egil_Raud"],
+  "description": "Changes the scope of the braid to a horizontal line",
+  "version": "1.0.0",
+}
