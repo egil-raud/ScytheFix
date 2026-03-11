@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/ScytheFix/ScytheFix/modinfo.json
+/ScytheFix/ScytheFix/ScytheFix.csproj
+/ScytheFix/ScytheFix/modinfo.json
