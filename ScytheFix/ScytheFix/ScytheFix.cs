@@ -1,0 +1,238 @@
+﻿using HarmonyLib;
+using ScytheFix.Config;
+using System;
+using System.Collections.Generic;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
+using Vintagestory.GameContent;
+
+namespace ScytheFix
+{
+    [HarmonyPatch]
+    public class ItemScytheRadiusPatch
+    {
+        [HarmonyPatch(typeof(ItemShears), "GetNearblyMultibreakables")]
+        [HarmonyPrefix]
+        static bool PrefixGetNearblyMultibreakables(IWorldAccessor world, BlockPos pos, Vec3d hitPos, ref OrderedDictionary<BlockPos, float> __result, ItemShears __instance)
+        {
+            if (!(__instance is ItemScythe))
+            {
+                return true;
+            }
+
+            // Получаем конфиг через статический экземпляр
+            var modSystem = ScytheFixModSystem.Instance;
+            if (modSystem == null)
+            {
+                return true; // Если мод-система не инициализирована, используем ванильное поведение
+            }
+
+            var config = modSystem.GetConfig();
+            if (config == null)
+            {
+                return true; // Если конфиг не загружен, используем ванильное поведение
+            }
+
+            __result = GetCustomScytheRadius(world, pos, hitPos, __instance, config);
+            return false;
+        }
+
+        private static OrderedDictionary<BlockPos, float> GetCustomScytheRadius(IWorldAccessor world, BlockPos centerPos, Vec3d hitPos, ItemShears shears, ScytheFixModConfig config) // Передаем конфиг параметром
+        {
+            var results = new OrderedDictionary<BlockPos, float>();
+
+            // Ищем ближайшего игрока с косой в руках в радиусе 5 блоков
+            IPlayer playerWithScythe = FindNearestPlayerWithScythe(world, centerPos);
+            if (playerWithScythe == null || playerWithScythe.Entity == null)
+            {
+                return results;
+            }
+
+            float playerYaw = playerWithScythe.Entity.Pos.Yaw;
+            Direction direction = GetPlayerDirection(playerYaw);
+
+            // Используем переданный конфиг
+            if (config.ArcScythe)
+            {
+                var linePositions = GetArcLinePositions(centerPos, direction);
+
+                foreach (var targetPos in linePositions)
+                {
+                    Block block = world.BlockAccessor.GetBlock(targetPos);
+                    bool canBreak = shears.CanMultiBreak(block);
+
+                    if (canBreak)
+                    {
+                        float distance = (float)hitPos.SquareDistanceTo(
+                            targetPos.X + 0.5,
+                            targetPos.Y + 0.5,
+                            targetPos.Z + 0.5
+                        );
+
+                        if (!results.ContainsKey(targetPos))
+                        {
+                            results.Add(targetPos, distance);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var linePositions = GetHorizontalLinePositions(centerPos, direction);
+
+                foreach (var targetPos in linePositions)
+                {
+                    Block block = world.BlockAccessor.GetBlock(targetPos);
+                    bool canBreak = shears.CanMultiBreak(block);
+
+                    if (canBreak)
+                    {
+                        float distance = (float)hitPos.SquareDistanceTo(
+                            targetPos.X + 0.5,
+                            targetPos.Y + 0.5,
+                            targetPos.Z + 0.5
+                        );
+
+                        if (!results.ContainsKey(targetPos))
+                        {
+                            results.Add(targetPos, distance);
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        // Ищет ближайшего игрока с косой в активной руке в радиусе 5 блоков
+        private static IPlayer FindNearestPlayerWithScythe(IWorldAccessor world, BlockPos centerPos)
+        {
+            IPlayer nearestPlayer = null;
+            double nearestDistance = double.MaxValue;
+
+            // Ищем игроков только в радиусе 5 блоков
+            var playersInRadius = world.GetPlayersAround(centerPos.ToVec3d(), 5, 5);
+            if (playersInRadius == null)
+                return null;
+
+            foreach (var player in playersInRadius)
+            {
+                if (player?.Entity == null) continue;
+
+                // Проверяем инвентарь
+                if (player.InventoryManager == null)
+                    continue;
+
+                // Проверяем расстояние до игрока
+                Vec3d playerPos = player.Entity.Pos.XYZ;
+                Vec3d centerVec = new Vec3d(centerPos.X, centerPos.Y, centerPos.Z);
+                double distance = playerPos.DistanceTo(centerVec);
+
+                // Проверяем, держит ли игрок косу в активной руке
+                ItemSlot activeSlot = player.InventoryManager.ActiveHotbarSlot;
+                if (activeSlot?.Itemstack?.Item is ItemScythe)
+                {
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestPlayer = player;
+                    }
+                }
+            }
+
+            return nearestPlayer;
+        }
+
+        private static List<BlockPos> GetHorizontalLinePositions(BlockPos centerPos, Direction direction)
+        {
+            var positions = new List<BlockPos>();
+
+            // Горизонтальная линия из 5 блоков
+            var lineOffsets = new[]
+            {
+                new int[] { 0, -2 },   // Левый
+                new int[] { 0, -1 },   // Левый центральный
+                new int[] { 0, 0 },    // Центральный
+                new int[] { 0, 1 },    // Правый центральный
+                new int[] { 0, 2 }     // Правый
+            };
+
+            foreach (var offset in lineOffsets)
+            {
+                int forward = offset[0];
+                int side = offset[1];
+
+                BlockPos pos = CalculatePosition(centerPos, direction, forward, side);
+                positions.Add(pos);
+            }
+
+            return positions;
+        }
+
+        private static List<BlockPos> GetArcLinePositions(BlockPos centerPos, Direction direction)
+        {
+            var positions = new List<BlockPos>();
+
+            // Горизонтальная линия из 5 блоков
+            var lineOffsets = new[]
+            {
+                // Ближний ряд (ближе к игроку) - крайние блоки
+                new int[] { -1, -2 },  // Левый крайний ближний
+                new int[] { -1, 2 },   // Правый крайний ближний
+                
+                // Центральный ряд - все три блока выдвинуты вперед
+                new int[] { 0, -1 },   // Левый центральный
+                new int[] { 0, 0 },    // Центральный
+                new int[] { 0, 1 }     // Правый центральный
+            };
+
+            foreach (var offset in lineOffsets)
+            {
+                int forward = offset[0];
+                int side = offset[1];
+
+                BlockPos pos = CalculatePosition(centerPos, direction, forward, side);
+                positions.Add(pos);
+            }
+
+            return positions;
+        }
+
+        private static BlockPos CalculatePosition(BlockPos centerPos, Direction direction, int forward, int side)
+        {
+            return direction switch
+            {
+                Direction.North => new BlockPos(centerPos.X + side, centerPos.Y, centerPos.Z + forward),
+                Direction.South => new BlockPos(centerPos.X - side, centerPos.Y, centerPos.Z - forward),
+                Direction.East => new BlockPos(centerPos.X + forward, centerPos.Y, centerPos.Z + side),
+                Direction.West => new BlockPos(centerPos.X - forward, centerPos.Y, centerPos.Z - side),
+                _ => centerPos.Copy()
+            };
+        }
+
+        private static Direction GetPlayerDirection(float yaw)
+        {
+            float normalizedYaw = yaw % GameMath.TWOPI;
+            if (normalizedYaw < 0) normalizedYaw += GameMath.TWOPI;
+
+            if (normalizedYaw >= GameMath.PI * 1.75f || normalizedYaw < GameMath.PI * 0.25f)
+                return Direction.North;
+            else if (normalizedYaw >= GameMath.PI * 0.25f && normalizedYaw < GameMath.PI * 0.75f)
+                return Direction.East;
+            else if (normalizedYaw >= GameMath.PI * 0.75f && normalizedYaw < GameMath.PI * 1.25f)
+                return Direction.South;
+            else
+                return Direction.West;
+        }
+
+        private enum Direction
+        {
+            North,
+            East,
+            South,
+            West
+        }
+    }
+}
