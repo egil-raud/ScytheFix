@@ -2,7 +2,7 @@
   "type": "code",
   "modid": "scythefix",
   "name": "ScytheFix",
-    "authors": [ "Egil_Raud","kastrom3" ],
-  "description": "Changes the scope of the braid to a horizontal line",
-  "version": "1.0.0"
+  "authors": [ "Egil_Raud", "kastrom3" ],
+  "description": "Changes the scope of the braid to a horizontal line or arc",
+  "version": "1.1.0"
 }
