@@ -15,7 +15,7 @@ namespace ScytheFix
     {
         [HarmonyPatch(typeof(ItemShears), "GetNearblyMultibreakables")]
         [HarmonyPrefix]
-        static bool PrefixGetNearblyMultibreakables(IWorldAccessor world, BlockPos pos, Vec3d hitPos, ref OrderedDictionary<BlockPos, float> __result, ItemShears __instance)
+        static bool PrefixGetNearblyMultibreakables(IWorldAccessor world, BlockPos pos, Vec3d hitPos, ref Vintagestory.API.Datastructures.OrderedDictionary<BlockPos, float> __result, ItemShears __instance)
         {
             if (!(__instance is ItemScythe))
             {
@@ -39,9 +39,9 @@ namespace ScytheFix
             return false;
         }
 
-        private static OrderedDictionary<BlockPos, float> GetCustomScytheRadius(IWorldAccessor world, BlockPos centerPos, Vec3d hitPos, ItemShears shears, ScytheFixModConfig config) // Передаем конфиг параметром
+        private static Vintagestory.API.Datastructures.OrderedDictionary<BlockPos, float> GetCustomScytheRadius(IWorldAccessor world, BlockPos centerPos, Vec3d hitPos, ItemShears shears, ScytheFixModConfig config) // Передаем конфиг параметром
         {
-            var results = new OrderedDictionary<BlockPos, float>();
+            var results = new Vintagestory.API.Datastructures.OrderedDictionary<BlockPos, float>();
 
             // Ищем ближайшего игрока с косой в руках в радиусе 5 блоков
             IPlayer playerWithScythe = FindNearestPlayerWithScythe(world, centerPos);
